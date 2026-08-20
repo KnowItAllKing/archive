@@ -50,8 +50,8 @@ func TestStoreWorkflow(t *testing.T) {
 	if len(before) < 2 || before[0].ID != keycloak.ID {
 		t.Fatalf("keycloak entry was not first: %#v", before)
 	}
-	if strings.HasPrefix(before[0].Snippet, "\n") {
-		t.Fatalf("snippet has leading blank line: %q", before[0].Snippet)
+	if strings.ContainsAny(before[0].Snippet, "\n\t") {
+		t.Fatalf("snippet contains raw whitespace: %q", before[0].Snippet)
 	}
 
 	store.now = func() time.Time {

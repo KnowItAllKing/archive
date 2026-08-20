@@ -10,6 +10,7 @@ import (
 	"github.com/nlpodyssey/cybertron/pkg/models/bert"
 	"github.com/nlpodyssey/cybertron/pkg/tasks"
 	"github.com/nlpodyssey/cybertron/pkg/tasks/textencoding"
+	"github.com/rs/zerolog"
 )
 
 type localEmbedder struct {
@@ -31,6 +32,9 @@ func (e *localEmbedder) ID() string {
 // pay the startup (or first-run download) cost.
 func (e *localEmbedder) load() (textencoding.Interface, error) {
 	e.once.Do(func() {
+		// Silence cybertron's per-run zerolog chatter; our own stderr notice
+		// covers the one event worth surfacing (the first-run download).
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
 		cacheDir, err := os.UserCacheDir()
 		if err != nil {
 			e.err = fmt.Errorf("find user cache directory for embedding models: %w", err)

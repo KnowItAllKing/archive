@@ -15,7 +15,7 @@ import (
 	archive "github.com/kai/archive/internal/archive"
 )
 
-const version = "1.0.3"
+const version = "1.0.4"
 
 const usage = `archive stores distilled knowledge in local Markdown files.
 

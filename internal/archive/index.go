@@ -217,7 +217,7 @@ func (s *Store) searchLexical(query, category string, limit int) ([]SearchResult
 			return nil, fmt.Errorf("read search result: %w", err)
 		}
 		result.Rank = len(results) + 1
-		result.Snippet = strings.TrimSpace(result.Snippet)
+		result.Snippet = strings.Join(strings.Fields(result.Snippet), " ")
 		if tags != "" {
 			result.Tags = strings.Fields(tags)
 		} else {
