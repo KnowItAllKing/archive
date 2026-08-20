@@ -180,6 +180,31 @@ func TestRemoteEmbedder(t *testing.T) {
 	}
 }
 
+func TestRemoteEmbedderRetriesTransientFailures(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte(`{"error":"Model is unloaded.."}`))
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"data": []map[string]any{{"index": 0, "embedding": []float64{1, 0}}},
+		})
+	}))
+	defer server.Close()
+
+	embedder := newRemoteEmbedder(server.URL+"/v1", "test-model", "")
+	vectors, err := embedder.Embed([]string{"text"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 3 || len(vectors) != 1 {
+		t.Fatalf("attempts = %d, vectors = %#v", attempts, vectors)
+	}
+}
+
 func TestVectorBlobRoundTrip(t *testing.T) {
 	vector := []float32{0.25, -1.5, 3}
 	decoded, err := decodeVector(encodeVector(vector))

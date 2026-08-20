@@ -69,30 +69,23 @@ func (e *remoteEmbedder) ID() string {
 	return "remote:" + e.model
 }
 
+// Embed retries transient endpoint failures: local inference servers with
+// just-in-time model loading (LM Studio) can answer 400 "Model is unloaded"
+// when a request races an auto-unload, and a retry triggers the reload.
 func (e *remoteEmbedder) Embed(texts []string) ([][]float32, error) {
-	payload, err := json.Marshal(map[string]any{"input": texts, "model": e.model})
-	if err != nil {
-		return nil, fmt.Errorf("encode embeddings request: %w", err)
+	var body []byte
+	var lastErr error
+	for attempt := 1; attempt <= 3; attempt++ {
+		if attempt > 1 {
+			time.Sleep(time.Duration(attempt-1) * 2 * time.Second)
+		}
+		body, lastErr = e.request(texts)
+		if lastErr == nil {
+			break
+		}
 	}
-	request, err := http.NewRequest(http.MethodPost, e.url, bytes.NewReader(payload))
-	if err != nil {
-		return nil, fmt.Errorf("build embeddings request: %w", err)
-	}
-	request.Header.Set("Content-Type", "application/json")
-	if e.apiKey != "" {
-		request.Header.Set("Authorization", "Bearer "+e.apiKey)
-	}
-	response, err := e.client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("call embeddings endpoint %s: %w", e.url, err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<20))
-	if err != nil {
-		return nil, fmt.Errorf("read embeddings response: %w", err)
-	}
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("embeddings endpoint %s returned %s: %s", e.url, response.Status, truncate(string(body), 300))
+	if lastErr != nil {
+		return nil, lastErr
 	}
 	var parsed struct {
 		Data []struct {
@@ -122,6 +115,34 @@ func (e *remoteEmbedder) Embed(texts []string) ([][]float32, error) {
 		}
 	}
 	return vectors, nil
+}
+
+func (e *remoteEmbedder) request(texts []string) ([]byte, error) {
+	payload, err := json.Marshal(map[string]any{"input": texts, "model": e.model})
+	if err != nil {
+		return nil, fmt.Errorf("encode embeddings request: %w", err)
+	}
+	request, err := http.NewRequest(http.MethodPost, e.url, bytes.NewReader(payload))
+	if err != nil {
+		return nil, fmt.Errorf("build embeddings request: %w", err)
+	}
+	request.Header.Set("Content-Type", "application/json")
+	if e.apiKey != "" {
+		request.Header.Set("Authorization", "Bearer "+e.apiKey)
+	}
+	response, err := e.client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("call embeddings endpoint %s: %w", e.url, err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64<<20))
+	if err != nil {
+		return nil, fmt.Errorf("read embeddings response: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("embeddings endpoint %s returned %s: %s", e.url, response.Status, truncate(string(body), 300))
+	}
+	return body, nil
 }
 
 func truncate(text string, limit int) string {
