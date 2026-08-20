@@ -5,17 +5,17 @@ import (
 	"fmt"
 )
 
-//go:embed doctor.md
-var doctorPrompt string
+//go:embed enter.md
+var enterPrompt string
 
-type DoctorConfig struct {
+type EnterConfig struct {
 	Harness string
 	Model   string
 	Effort  string
 }
 
-func DoctorArgs(config DoctorConfig, statusReport string) ([]string, error) {
-	prompt := doctorPrompt + "\n# Current store status\n\n" + statusReport + "\n"
+func EnterArgs(config EnterConfig, statusReport string) ([]string, error) {
+	prompt := enterPrompt + "\n# Current store status\n\n" + statusReport + "\n"
 	switch config.Harness {
 	case "claude":
 		model := config.Model
@@ -37,6 +37,6 @@ func DoctorArgs(config DoctorConfig, statusReport string) ([]string, error) {
 		args = append(args, "-c", "model_reasoning_effort="+config.Effort, prompt)
 		return args, nil
 	default:
-		return nil, fmt.Errorf("unknown doctor harness %q: use claude or codex", config.Harness)
+		return nil, fmt.Errorf("unknown harness %q: use claude or codex", config.Harness)
 	}
 }

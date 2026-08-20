@@ -85,14 +85,14 @@ By default entries are embedded with a local model (`sentence-transformers/all-M
 
 Vectors live in `.index/embeddings.db`, keyed by model and content hash. Unlike the FTS index this cache is persistent: reindexing embeds only new or changed content and prunes vectors whose content is gone. Ranking is brute-force cosine in Go — at personal-archive scale that is a few milliseconds, so there is no vector-database dependency. `archive status` reports the active backend and coverage.
 
-## Doctor
+## Enter the archives
 
 ```sh
-archive doctor                # claude, model fable, effort high
-archive doctor codex --model gpt-5.2 --effort medium
+archive enter                # claude, model fable, effort high
+archive enter codex --model gpt-5.2 --effort medium
 ```
 
-`doctor` opens an interactive session with an agent CLI (`claude` or `codex`), primed with an embedded upkeep prompt plus a live status report. The agent runs routine maintenance on its own — status, reindex, migrate, push — and asks before touching content: committing hand edits, gardening inbox entries into categories, or merging near-duplicates.
+`enter` opens an interactive session with an agent CLI (`claude` or `codex`) playing the archivist, primed with an embedded upkeep prompt plus a live status report. The archivist runs routine maintenance on its own — status, reindex, migrate, push — and asks before touching content: committing hand edits, gardening inbox entries into categories, or merging near-duplicates.
 
 ## Upgrades
 

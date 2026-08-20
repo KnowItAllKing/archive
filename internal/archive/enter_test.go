@@ -5,8 +5,8 @@ import (
 	"testing"
 )
 
-func TestDoctorArgsClaudeDefaults(t *testing.T) {
-	args, err := DoctorArgs(DoctorConfig{Harness: "claude", Effort: "high"}, "STATUS_REPORT")
+func TestEnterArgsClaudeDefaults(t *testing.T) {
+	args, err := EnterArgs(EnterConfig{Harness: "claude", Effort: "high"}, "STATUS_REPORT")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,13 +15,13 @@ func TestDoctorArgsClaudeDefaults(t *testing.T) {
 		t.Fatalf("claude args = %q", joined)
 	}
 	prompt := args[len(args)-1]
-	if !strings.Contains(prompt, "archive doctor") || !strings.Contains(prompt, "STATUS_REPORT") {
+	if !strings.Contains(prompt, "archivist") || !strings.Contains(prompt, "STATUS_REPORT") {
 		t.Fatalf("prompt missing content: %q", prompt[:80])
 	}
 }
 
-func TestDoctorArgsCodex(t *testing.T) {
-	args, err := DoctorArgs(DoctorConfig{Harness: "codex", Model: "gpt-5.2", Effort: "medium"}, "STATUS")
+func TestEnterArgsCodex(t *testing.T) {
+	args, err := EnterArgs(EnterConfig{Harness: "codex", Model: "gpt-5.2", Effort: "medium"}, "STATUS")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestDoctorArgsCodex(t *testing.T) {
 		t.Fatalf("codex args = %q", joined)
 	}
 
-	args, err = DoctorArgs(DoctorConfig{Harness: "codex", Effort: "high"}, "STATUS")
+	args, err = EnterArgs(EnterConfig{Harness: "codex", Effort: "high"}, "STATUS")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +39,8 @@ func TestDoctorArgsCodex(t *testing.T) {
 	}
 }
 
-func TestDoctorArgsRejectsUnknownHarness(t *testing.T) {
-	if _, err := DoctorArgs(DoctorConfig{Harness: "gemini"}, ""); err == nil || !strings.Contains(err.Error(), "unknown doctor harness") {
+func TestEnterArgsRejectsUnknownHarness(t *testing.T) {
+	if _, err := EnterArgs(EnterConfig{Harness: "gemini"}, ""); err == nil || !strings.Contains(err.Error(), "unknown harness") {
 		t.Fatalf("error = %v", err)
 	}
 }
