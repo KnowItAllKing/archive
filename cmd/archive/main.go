@@ -7,13 +7,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"sort"
 	"strings"
+	"syscall"
 
 	archive "github.com/kai/archive/internal/archive"
 )
 
-const version = "1.0.2"
+const version = "1.0.3"
 
 const usage = `archive stores distilled knowledge in local Markdown files.
 
@@ -30,6 +32,7 @@ Usage:
   archive migrate
   archive reindex
   archive prompt [--json]
+  archive doctor [claude|codex] [--model NAME] [--effort LEVEL]
   archive version
 
 ARCHIVE_STORE selects the store. It defaults to ~/archive-store.
@@ -66,6 +69,8 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 			return errors.New("usage: archive push")
 		}
 		return store.Push(stdout)
+	case "doctor":
+		return runDoctor(store, args[1:])
 	case "version":
 		if len(args) != 1 {
 			return errors.New("usage: archive version")
@@ -367,6 +372,45 @@ func runPrompt(args []string, stdout io.Writer) error {
 	}
 	_, err := io.WriteString(stdout, archive.Prompt())
 	return err
+}
+
+func runDoctor(store *archive.Store, args []string) error {
+	harness := "claude"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		harness = args[0]
+		args = args[1:]
+	}
+	fs := newFlagSet("doctor")
+	model := fs.String("model", "", "model for the doctor session")
+	effort := fs.String("effort", "high", "reasoning effort for the doctor session")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("doctor flags: %w", err)
+	}
+	if fs.NArg() != 0 {
+		return errors.New("usage: archive doctor [claude|codex] [--model NAME] [--effort LEVEL]")
+	}
+	statusReport := ""
+	status, err := store.Status()
+	if err != nil {
+		statusReport = "`archive status` failed: " + err.Error() + "\nHelp the user fix this first."
+	} else {
+		var rendered strings.Builder
+		if err := writeJSON(&rendered, status); err != nil {
+			return err
+		}
+		statusReport = "```json\n" + rendered.String() + "```"
+	}
+	doctorArgs, err := archive.DoctorArgs(archive.DoctorConfig{
+		Harness: harness, Model: *model, Effort: *effort,
+	}, statusReport)
+	if err != nil {
+		return err
+	}
+	binary, err := exec.LookPath(doctorArgs[0])
+	if err != nil {
+		return fmt.Errorf("%s CLI not found on PATH", doctorArgs[0])
+	}
+	return syscall.Exec(binary, doctorArgs, os.Environ())
 }
 
 func stdinIsTerminal(stdin io.Reader) bool {
