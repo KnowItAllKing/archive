@@ -119,3 +119,13 @@ The two layers version independently:
 ## Agent integration
 
 `archive prompt` prints the canonical ingest and retrieval contract. The `archive` skill is a thin wrapper over it and lives in the fleet repo (`~/fleet/skills/archive/`), which links it into every configured harness path (`~/.agents/skills`, `~/.claude/skills`, `~/.cline/skills`) via `make sync`.
+
+## Backlog
+
+Built when real usage demands them, roughly in order:
+
+- **`delete` and `merge`.** No CLI path removes an entry today. `archive delete ID` (Git history is the tombstone) and `archive merge LOSER WINNER` — an agent writes the merged body, the CLI mechanically deletes, prunes vectors, and records a redirect so old `[[loser-id]]` links resolve to the winner.
+- **Link integrity in `sync`.** With wikilinks in the ingest contract, `sync` becomes the fsck: dangling `[[links]]`, orphaned `raw/` files, raw files no entry references.
+- **Backlinks in `show`.** "What points here" — one scan over the store at this scale.
+- **Shell completions.** zsh completion for commands, categories, and entry IDs.
+- **Jot trigger in the skill.** Add "jot this down" phrasing to the fleet skill so quick capture works from any harness.
