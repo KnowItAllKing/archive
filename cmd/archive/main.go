@@ -15,17 +15,20 @@ import (
 	archive "github.com/KnowItAllKing/archive/internal/archive"
 )
 
-const version = "1.0.6"
+const version = "1.1.0"
 
 const usage = `archive stores distilled knowledge in local Markdown files.
 
 Usage:
   archive init [--remote URL]
-  archive add --title TITLE --category CATEGORY --tags TAGS [--source SOURCE] [--file FILE] [--raw FILE]
+  archive add --title TITLE --category CATEGORY --tags TAGS [--source SOURCE] [--review DATE] [--file FILE] [--raw FILE]
+  archive jot [--source SOURCE] TEXT...
   archive update [flags] ID
   archive search [--category CATEGORY] [-n LIMIT] [--lexical | --semantic] [--json] QUERY
+  archive related [-n LIMIT] [--json] ID
   archive show [--json] ID
-  archive list [--category CATEGORY] [--tag TAG] [--json]
+  archive list [--category CATEGORY] [--tag TAG] [--due-review] [--json]
+  archive sync
   archive categories [--json]
   archive status [--json]
   archive push
@@ -79,6 +82,15 @@ func run(args []string, stdin io.Reader, stdout io.Writer) error {
 		return err
 	case "add":
 		return runAdd(store, args[1:], stdin, stdout)
+	case "jot":
+		return runJot(store, args[1:], stdin, stdout)
+	case "related":
+		return runRelated(store, args[1:], stdout)
+	case "sync":
+		if len(args) != 1 {
+			return errors.New("usage: archive sync")
+		}
+		return store.Sync(stdout)
 	case "update":
 		return runUpdate(store, args[1:], stdin, stdout)
 	case "search":
@@ -154,6 +166,12 @@ func runStatus(store *archive.Store, args []string, stdout io.Writer) error {
 	for _, name := range names {
 		fmt.Fprintf(stdout, "  %s: %d\n", name, status.Categories[name])
 	}
+	if status.Jots > 0 {
+		fmt.Fprintf(stdout, "jots: %d\n", status.Jots)
+	}
+	if status.NeedsReview > 0 {
+		fmt.Fprintf(stdout, "needs review: %d\n", status.NeedsReview)
+	}
 	if status.Embeddings == "off" {
 		fmt.Fprintln(stdout, "embeddings: off")
 	} else {
@@ -181,6 +199,7 @@ func runAdd(store *archive.Store, args []string, stdin io.Reader, stdout io.Writ
 	category := fs.String("category", "", "entry category")
 	tags := fs.String("tags", "", "comma-separated tags")
 	source := fs.String("source", "", "source URL, path, or session reference")
+	review := fs.String("review", "", "date this knowledge should be re-verified (YYYY-MM-DD)")
 	file := fs.String("file", "", "read distilled body from file")
 	raw := fs.String("raw", "", "stash an ephemeral raw source")
 	jsonOutput := fs.Bool("json", false, "print JSON")
@@ -188,7 +207,7 @@ func runAdd(store *archive.Store, args []string, stdin io.Reader, stdout io.Writ
 		return fmt.Errorf("add flags: %w", err)
 	}
 	if fs.NArg() != 0 || *title == "" || *category == "" {
-		return errors.New("usage: archive add --title TITLE --category CATEGORY --tags TAGS [--source SOURCE] [--file FILE] [--raw FILE]")
+		return errors.New("usage: archive add --title TITLE --category CATEGORY --tags TAGS [--source SOURCE] [--review DATE] [--file FILE] [--raw FILE]")
 	}
 	if *file == "" && stdinIsTerminal(stdin) {
 		return errors.New("no body provided: pipe the distilled body on stdin or pass --file")
@@ -199,7 +218,7 @@ func runAdd(store *archive.Store, args []string, stdin io.Reader, stdout io.Writ
 	}
 	entry, err := store.Add(archive.AddInput{
 		Title: *title, Category: *category, Tags: archive.ParseTags(*tags),
-		Source: *source, Body: body, RawFile: *raw,
+		Source: *source, Review: *review, Body: body, RawFile: *raw,
 	})
 	if err != nil {
 		return err
@@ -217,6 +236,7 @@ func runUpdate(store *archive.Store, args []string, stdin io.Reader, stdout io.W
 	category := fs.String("category", "", "replace category")
 	tags := fs.String("tags", "", "replace comma-separated tags")
 	source := fs.String("source", "", "replace source")
+	review := fs.String("review", "", "replace review date (empty clears it)")
 	file := fs.String("file", "", "read replacement body from file")
 	keepBody := fs.Bool("keep-body", false, "keep the existing body and only change fields")
 	jsonOutput := fs.Bool("json", false, "print JSON")
@@ -244,6 +264,7 @@ func runUpdate(store *archive.Store, args []string, stdin io.Reader, stdout io.W
 		Category: *category, SetCategory: set["category"],
 		Tags: archive.ParseTags(*tags), SetTags: set["tags"],
 		Source: *source, SetSource: set["source"],
+		Review: *review, SetReview: set["review"],
 	})
 	if err != nil {
 		return err
@@ -312,14 +333,15 @@ func runList(store *archive.Store, args []string, stdout io.Writer) error {
 	fs := newFlagSet("list")
 	category := fs.String("category", "", "category filter")
 	tag := fs.String("tag", "", "tag filter")
+	dueReview := fs.Bool("due-review", false, "only entries whose review date has passed")
 	jsonOutput := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("list flags: %w", err)
 	}
 	if fs.NArg() != 0 {
-		return errors.New("usage: archive list [--category CATEGORY] [--tag TAG] [--json]")
+		return errors.New("usage: archive list [--category CATEGORY] [--tag TAG] [--due-review] [--json]")
 	}
-	entries, err := store.List(*category, *tag)
+	entries, err := store.List(*category, *tag, *dueReview)
 	if err != nil {
 		return err
 	}
@@ -372,6 +394,58 @@ func runPrompt(args []string, stdout io.Writer) error {
 	}
 	_, err := io.WriteString(stdout, archive.Prompt())
 	return err
+}
+
+func runJot(store *archive.Store, args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := newFlagSet("jot")
+	source := fs.String("source", "", "source URL, path, or session reference")
+	jsonOutput := fs.Bool("json", false, "print JSON")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("jot flags: %w", err)
+	}
+	text := strings.Join(fs.Args(), " ")
+	if text == "" {
+		if stdinIsTerminal(stdin) {
+			return errors.New("usage: archive jot [--source SOURCE] TEXT...  (or pipe text on stdin)")
+		}
+		body, err := readBody("", stdin)
+		if err != nil {
+			return err
+		}
+		text = body
+	}
+	entry, err := store.Jot(text, *source)
+	if err != nil {
+		return err
+	}
+	if *jsonOutput {
+		return writeJSON(stdout, entry)
+	}
+	_, err = fmt.Fprintln(stdout, entry.ID)
+	return err
+}
+
+func runRelated(store *archive.Store, args []string, stdout io.Writer) error {
+	fs := newFlagSet("related")
+	limit := fs.Int("n", 10, "maximum results")
+	jsonOutput := fs.Bool("json", false, "print JSON")
+	if err := fs.Parse(args); err != nil {
+		return fmt.Errorf("related flags: %w", err)
+	}
+	if fs.NArg() != 1 {
+		return errors.New("usage: archive related [-n LIMIT] [--json] ID")
+	}
+	results, err := store.Related(fs.Arg(0), *limit)
+	if err != nil {
+		return err
+	}
+	if *jsonOutput {
+		return writeJSON(stdout, results)
+	}
+	for _, result := range results {
+		fmt.Fprintf(stdout, "%d. %s [%s] score=%.6f\n   %s\n   tags: %s\n", result.Rank, result.Title, result.Category, result.Score, result.Snippet, strings.Join(result.Tags, ", "))
+	}
+	return nil
 }
 
 func runEnter(store *archive.Store, args []string) error {

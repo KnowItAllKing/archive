@@ -49,7 +49,20 @@ Search is hybrid by default: BM25 over FTS5 and cosine similarity over embedding
 
 `update` replaces the body from stdin or `--file`. To change only metadata, pass `--keep-body`. Empty bodies are rejected on both `add` and `update`.
 
+`archive related ID` lists the nearest entries by embedding similarity — for finding `[[entry-id]]` link targets, spotting near-duplicates before adding, and picking merge candidates.
+
 Run `archive help` for all commands. Read commands accept `--json`.
+
+## Capture and decay
+
+```sh
+archive jot "keycloak scopes might be unnecessary on ingest, verify against staging"
+archive add --review 2026-11-01 ...
+archive list --tag jot        # capture backlog awaiting distillation
+archive list --due-review     # perishable knowledge past its verify-by date
+```
+
+`jot` is the two-second capture path: no title, no category — the text lands in `inbox/` tagged `jot`, title auto-derived, for the archivist to distill later. `--review DATE` marks knowledge with a shelf life (unverified claims, version-specific facts); `status` counts entries past review and `enter` sessions work through them.
 
 ## Data model
 
@@ -71,10 +84,11 @@ Commits are automatic; pushing is always explicit:
 
 ```sh
 archive status
+archive sync
 archive push
 ```
 
-`status` reports entry counts per category, the store format, uncommitted hand edits (for example from Obsidian), and how many commits the remote is missing. `push` pushes the current branch to `origin` and is the only command that ever contacts the network.
+`status` reports entry counts per category, the store format, jot and review backlogs, uncommitted hand edits (for example from Obsidian), and how many commits the remote is missing. `sync` reconciles changes made outside the CLI: it validates every entry (refusing to commit a broken hand edit), rebuilds the index and embeddings, commits the edits, and prints the backlog summary. `push` pushes the current branch to `origin` and is the only command that ever contacts the network.
 
 ## Embeddings
 

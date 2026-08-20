@@ -34,6 +34,15 @@ personal knowledge. Harness memory is disabled, not migrated.
   one authoritative entry per topic; Git history preserves its evolution.
 - **Curated taxonomy.** Agents must pick from `categories.yaml` or file under
   `inbox/` for later gardening. They never mint categories.
+- **Capture is separate from filing.** `archive jot` stores a raw thought in
+  `inbox/` tagged `jot` with zero ceremony; distillation into a real entry is
+  deferred gardening work, not a precondition of capture.
+- **Knowledge decays.** An optional `review` date marks perishable entries;
+  `status`, `list --due-review`, and archivist sessions resurface them so the
+  archive stays trustworthy instead of write-only.
+- **Hand edits are reconciled, not forbidden.** `archive sync` validates every
+  entry, rebuilds derived state, and commits out-of-band edits — failing
+  loudly before committing a broken file.
 - **Distilled + smart raw.** The distillate is canonical; a source pointer is
   always kept; raw text is stashed only when the source is ephemeral.
 - **Versioned layers.** The index schema is stamped with `PRAGMA user_version`

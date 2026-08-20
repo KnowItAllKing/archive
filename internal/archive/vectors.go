@@ -214,6 +214,63 @@ func (s *Store) searchSemantic(query, category string, limit int) ([]SearchResul
 	return results, nil
 }
 
+func (s *Store) Related(id string, limit int) ([]SearchResult, error) {
+	if err := s.requireInitialized(); err != nil {
+		return nil, err
+	}
+	if s.Embedder == nil {
+		return nil, errors.New("related requires embeddings (ARCHIVE_EMBEDDINGS is off)")
+	}
+	if limit < 1 {
+		return nil, errors.New("related limit must be at least 1")
+	}
+	entries, err := s.readAllEntries()
+	if err != nil {
+		return nil, err
+	}
+	found := false
+	for _, entry := range entries {
+		if entry.ID == id {
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("entry %q not found", id)
+	}
+	if err := s.ensureEmbeddings(entries); err != nil {
+		return nil, err
+	}
+	vectors, err := s.loadVectors(entries)
+	if err != nil {
+		return nil, err
+	}
+	target := vectors[id]
+	results := make([]SearchResult, 0, len(entries)-1)
+	for _, entry := range entries {
+		if entry.ID == id {
+			continue
+		}
+		results = append(results, SearchResult{
+			ID: entry.ID, Title: entry.Title, Category: entry.Category, Tags: entry.Tags,
+			Score:   dot(target, vectors[entry.ID]),
+			Snippet: bodyPrefix(entry.Body, 25),
+		})
+	}
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Score == results[j].Score {
+			return results[i].ID < results[j].ID
+		}
+		return results[i].Score > results[j].Score
+	})
+	if len(results) > limit {
+		results = results[:limit]
+	}
+	for i := range results {
+		results[i].Rank = i + 1
+	}
+	return results, nil
+}
+
 func fuseRRF(lexical, semantic []SearchResult, limit int) []SearchResult {
 	const k = 60.0
 	scores := map[string]float64{}

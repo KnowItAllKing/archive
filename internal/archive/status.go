@@ -8,15 +8,17 @@ import (
 )
 
 type Status struct {
-	Store      string         `json:"store"`
-	Format     int            `json:"format"`
-	Entries    int            `json:"entries"`
-	Categories map[string]int `json:"categories"`
-	Embeddings string         `json:"embeddings"`
-	Embedded   int            `json:"embedded"`
-	Remote     string         `json:"remote,omitempty"`
-	Unpushed   int            `json:"unpushed"`
-	Dirty      []string       `json:"dirty"`
+	Store       string         `json:"store"`
+	Format      int            `json:"format"`
+	Entries     int            `json:"entries"`
+	Categories  map[string]int `json:"categories"`
+	Jots        int            `json:"jots"`
+	NeedsReview int            `json:"needs_review"`
+	Embeddings  string         `json:"embeddings"`
+	Embedded    int            `json:"embedded"`
+	Remote      string         `json:"remote,omitempty"`
+	Unpushed    int            `json:"unpushed"`
+	Dirty       []string       `json:"dirty"`
 }
 
 func (s *Store) Status() (Status, error) {
@@ -32,8 +34,17 @@ func (s *Store) Status() (Status, error) {
 		return Status{}, err
 	}
 	categories := map[string]int{}
+	jots := 0
+	needsReview := 0
+	today := s.now().Format("2006-01-02")
 	for _, entry := range entries {
 		categories[entry.Category]++
+		if contains(entry.Tags, "jot") {
+			jots++
+		}
+		if reviewDue(entry, today) {
+			needsReview++
+		}
 	}
 	embeddings := "off"
 	embedded := 0
@@ -67,9 +78,54 @@ func (s *Store) Status() (Status, error) {
 	}
 	return Status{
 		Store: s.Root, Format: format, Entries: len(entries), Categories: categories,
+		Jots: jots, NeedsReview: needsReview,
 		Embeddings: embeddings, Embedded: embedded,
 		Remote: remote, Unpushed: unpushed, Dirty: dirty,
 	}, nil
+}
+
+// Sync reconciles changes made outside the CLI: it validates every entry,
+// rebuilds the derived index, commits hand edits, and reports the backlog.
+// Validation runs first so a broken hand edit is never committed.
+func (s *Store) Sync(output io.Writer) error {
+	if err := s.requireInitialized(); err != nil {
+		return err
+	}
+	if _, err := s.readAllEntries(); err != nil {
+		return fmt.Errorf("store validation failed; fix the hand edit, then rerun archive sync: %w", err)
+	}
+	count, err := s.Reindex()
+	if err != nil {
+		return err
+	}
+	porcelain, err := s.gitOutput("status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(porcelain) != "" {
+		if err := s.commitAll("sync: hand edits"); err != nil {
+			return err
+		}
+		fmt.Fprintln(output, "committed hand edits")
+	}
+	status, err := s.Status()
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(output, "synced %d entries\n", count)
+	if status.Jots > 0 {
+		fmt.Fprintf(output, "jot backlog: %d (archive list --tag jot)\n", status.Jots)
+	}
+	if inbox := status.Categories["inbox"]; inbox > 0 {
+		fmt.Fprintf(output, "inbox: %d awaiting categorization\n", inbox)
+	}
+	if status.NeedsReview > 0 {
+		fmt.Fprintf(output, "needs review: %d (archive list --due-review)\n", status.NeedsReview)
+	}
+	if status.Unpushed > 0 {
+		fmt.Fprintf(output, "unpushed: %d commits (archive push)\n", status.Unpushed)
+	}
+	return nil
 }
 
 func (s *Store) Push(output io.Writer) error {

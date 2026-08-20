@@ -26,6 +26,7 @@ type Entry struct {
 	Tags     []string `yaml:"tags" json:"tags"`
 	Created  string   `yaml:"created" json:"created"`
 	Updated  string   `yaml:"updated" json:"updated"`
+	Review   string   `yaml:"review,omitempty" json:"review,omitempty"`
 	Source   string   `yaml:"source,omitempty" json:"source,omitempty"`
 	Raw      string   `yaml:"raw,omitempty" json:"raw,omitempty"`
 	Body     string   `yaml:"-" json:"body"`
@@ -38,6 +39,7 @@ type EntrySummary struct {
 	Tags     []string `json:"tags"`
 	Created  string   `json:"created"`
 	Updated  string   `json:"updated"`
+	Review   string   `json:"review,omitempty"`
 	Source   string   `json:"source,omitempty"`
 	Raw      string   `json:"raw,omitempty"`
 }
@@ -45,7 +47,8 @@ type EntrySummary struct {
 func (entry Entry) Summary() EntrySummary {
 	return EntrySummary{
 		ID: entry.ID, Title: entry.Title, Category: entry.Category, Tags: entry.Tags,
-		Created: entry.Created, Updated: entry.Updated, Source: entry.Source, Raw: entry.Raw,
+		Created: entry.Created, Updated: entry.Updated, Review: entry.Review,
+		Source: entry.Source, Raw: entry.Raw,
 	}
 }
 
@@ -129,6 +132,11 @@ func validateEntry(entry Entry) error {
 	for _, date := range dates {
 		if _, err := time.Parse("2006-01-02", date.value); err != nil {
 			return fmt.Errorf("entry %q has invalid %s date %q: use YYYY-MM-DD", entry.ID, date.name, date.value)
+		}
+	}
+	if entry.Review != "" {
+		if _, err := time.Parse("2006-01-02", entry.Review); err != nil {
+			return fmt.Errorf("entry %q has invalid review date %q: use YYYY-MM-DD", entry.ID, entry.Review)
 		}
 	}
 	if entry.Raw != "" {

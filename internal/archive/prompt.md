@@ -11,6 +11,8 @@
 5. Set `--source` to the URL, file path, or session reference for every entry.
 6. Use `--raw` only for ephemeral sources such as conversations or links likely to disappear. Durable sources do not need a raw copy.
 7. Add lowercase kebab-case tags. Include retrieval synonyms that a short human query may use.
+8. If the knowledge is perishable — an unverified claim, a version-specific fact, a decision pending confirmation — set `--review YYYY-MM-DD` for when it should be re-verified. `archive list --due-review` surfaces overdue entries.
+9. Link related entries by writing `[[entry-id]]` in the body. `archive related --json ID` lists the nearest entries by embedding similarity; use it to find link targets and to spot near-duplicates that should be merged instead of added.
 
 For a new entry, pass the distilled Markdown body on stdin or with `--file`:
 
@@ -24,7 +26,9 @@ For a strong topical match, preserve the useful existing material while replacin
 archive update --title "..." --tags "auth,keycloak,terraform" --source "..." --file distilled.md ENTRY_ID
 ```
 
-To change only metadata (tags, title, category, source) without touching the body, pass `--keep-body` instead of a body.
+To change only metadata (tags, title, category, source, review) without touching the body, pass `--keep-body` instead of a body.
+
+Entries tagged `jot` are raw captured thoughts awaiting distillation (`archive list --tag jot`). Distilling one means rewriting it as a proper entry: real title, distilled body, category, tags without `jot`.
 
 ## Retrieval
 

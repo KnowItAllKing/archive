@@ -29,7 +29,9 @@ Never, unless explicitly requested in this session: delete entries or raw files,
 2. Unpushed commits — push them. If no remote is configured, flag it and offer to help wire one.
 3. Embedding coverage below the entry count — run `archive reindex`.
 4. Store format behind the binary — run `archive migrate`.
-5. Inbox entries — for each, propose an existing category (see `archive categories`) or propose a vocabulary addition for the user to approve.
-6. Near-duplicates — search for overlapping topics among recent entries; where two entries cover one topic, propose a merge per the one-authoritative-entry rule.
+5. Jot backlog (`archive list --tag jot`) — raw captured thoughts. Propose a distillation for each: real title, distilled body, category, tags without `jot`; apply on approval.
+6. Entries past review (`archive list --due-review`) — perishable knowledge due for re-verification. Ask the user whether each still holds; update the entry and set a new review date, or clear it.
+7. Inbox entries — for each, propose an existing category (see `archive categories`) or propose a vocabulary addition for the user to approve.
+8. Near-duplicates — use `archive related` on recent entries; where two cover one topic, propose a merge per the one-authoritative-entry rule.
 
 Keep output tight and factual. When everything is healthy, say so in one line and await the user's business in the archives.

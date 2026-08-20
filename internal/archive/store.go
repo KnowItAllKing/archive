@@ -32,6 +32,7 @@ type AddInput struct {
 	Category string
 	Tags     []string
 	Source   string
+	Review   string
 	Body     string
 	RawFile  string
 }
@@ -47,6 +48,8 @@ type UpdateInput struct {
 	SetTags     bool
 	Source      string
 	SetSource   bool
+	Review      string
+	SetReview   bool
 }
 
 type Category struct {
@@ -163,7 +166,8 @@ func (s *Store) Add(input AddInput) (Entry, error) {
 	}
 	entry := Entry{
 		ID: id, Title: input.Title, Category: input.Category, Tags: tags,
-		Created: date, Updated: date, Source: strings.TrimSpace(input.Source), Body: normalizeBody(input.Body),
+		Created: date, Updated: date, Review: strings.TrimSpace(input.Review),
+		Source: strings.TrimSpace(input.Source), Body: normalizeBody(input.Body),
 	}
 	paths := []string{filepath.ToSlash(s.relativeEntryPath(entry))}
 	if input.RawFile != "" {
@@ -222,12 +226,15 @@ func (s *Store) Update(id string, input UpdateInput) (Entry, error) {
 	if input.SetSource {
 		entry.Source = strings.TrimSpace(input.Source)
 	}
+	if input.SetReview {
+		entry.Review = strings.TrimSpace(input.Review)
+	}
 	body := normalizeBody(input.Body)
 	if input.KeepBody {
 		if body != "" {
 			return Entry{}, errors.New("cannot combine --keep-body with a replacement body")
 		}
-		if !input.SetTitle && !input.SetCategory && !input.SetTags && !input.SetSource {
+		if !input.SetTitle && !input.SetCategory && !input.SetTags && !input.SetSource && !input.SetReview {
 			return Entry{}, errors.New("nothing to update: --keep-body was set and no fields were changed")
 		}
 	} else if body == "" {
@@ -260,6 +267,30 @@ func (s *Store) Update(id string, input UpdateInput) (Entry, error) {
 	return entry, nil
 }
 
+func (s *Store) Jot(text, source string) (Entry, error) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return Entry{}, errors.New("jot text is empty")
+	}
+	return s.Add(AddInput{
+		Title: jotTitle(text), Category: "inbox", Tags: []string{"jot"},
+		Source: source, Body: text + "\n",
+	})
+}
+
+func jotTitle(text string) string {
+	fields := strings.Fields(text)
+	if len(fields) > 8 {
+		fields = fields[:8]
+	}
+	title := strings.Join(fields, " ")
+	runes := []rune(title)
+	if len(runes) > 60 {
+		title = string(runes[:60])
+	}
+	return title
+}
+
 func (s *Store) Show(id string) (Entry, []byte, error) {
 	if err := s.requireInitialized(); err != nil {
 		return Entry{}, nil, err
@@ -268,7 +299,7 @@ func (s *Store) Show(id string) (Entry, []byte, error) {
 	return entry, raw, err
 }
 
-func (s *Store) List(category, tag string) ([]Entry, error) {
+func (s *Store) List(category, tag string, dueReview bool) ([]Entry, error) {
 	if err := s.requireInitialized(); err != nil {
 		return nil, err
 	}
@@ -279,12 +310,16 @@ func (s *Store) List(category, tag string) ([]Entry, error) {
 	if err != nil {
 		return nil, err
 	}
+	today := s.now().Format("2006-01-02")
 	filtered := entries[:0]
 	for _, entry := range entries {
 		if category != "" && entry.Category != category {
 			continue
 		}
 		if tag != "" && !contains(entry.Tags, tag) {
+			continue
+		}
+		if dueReview && !reviewDue(entry, today) {
 			continue
 		}
 		filtered = append(filtered, entry)
@@ -545,6 +580,11 @@ func (s *Store) uniqueID(base string) (string, error) {
 			return candidate, nil
 		}
 	}
+}
+
+// ISO dates compare correctly as strings.
+func reviewDue(entry Entry, today string) bool {
+	return entry.Review != "" && entry.Review <= today
 }
 
 func contains(values []string, target string) bool {

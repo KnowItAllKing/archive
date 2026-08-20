@@ -87,7 +87,7 @@ func TestMigrateStampsPreManifestStore(t *testing.T) {
 	if err := os.Remove(store.manifestPath()); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.List("", ""); err != nil {
+	if _, err := store.List("", "", false); err != nil {
 		t.Fatalf("pre-manifest store rejected: %v", err)
 	}
 	if err := store.Migrate(&bytes.Buffer{}); err != nil {
@@ -111,7 +111,7 @@ func TestFormatVersionGates(t *testing.T) {
 	if err := os.WriteFile(store.manifestPath(), []byte("format: 99\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.List("", ""); err == nil || !strings.Contains(err.Error(), "newer than this binary") {
+	if _, err := store.List("", "", false); err == nil || !strings.Contains(err.Error(), "newer than this binary") {
 		t.Fatalf("newer-format error = %v", err)
 	}
 	if err := store.Migrate(&bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "newer than this binary") {
@@ -120,7 +120,7 @@ func TestFormatVersionGates(t *testing.T) {
 	if err := os.WriteFile(store.manifestPath(), []byte("format: 0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.List("", ""); err == nil || !strings.Contains(err.Error(), "invalid format") {
+	if _, err := store.List("", "", false); err == nil || !strings.Contains(err.Error(), "invalid format") {
 		t.Fatalf("invalid-format error = %v", err)
 	}
 }
