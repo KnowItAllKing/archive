@@ -12,7 +12,7 @@ import (
 	"strings"
 	"syscall"
 
-	archive "github.com/kai/archive/internal/archive"
+	archive "github.com/KnowItAllKing/archive/internal/archive"
 )
 
 const version = "1.0.6"

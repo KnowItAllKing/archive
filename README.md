@@ -7,9 +7,10 @@ Nothing loads the store into an agent session by default. Run `archive prompt` f
 ## Install
 
 ```sh
-go install ./cmd/archive
-go build -o ~/bin/archive ./cmd/archive
+go install github.com/KnowItAllKing/archive/cmd/archive@latest
 ```
+
+Or from a checkout: `go install ./cmd/archive`.
 
 The store defaults to `~/archive-store`. Set `ARCHIVE_STORE` to use another path.
 

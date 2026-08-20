@@ -1,4 +1,4 @@
-module github.com/kai/archive
+module github.com/KnowItAllKing/archive
 
 go 1.24.0
 
