@@ -44,7 +44,7 @@ archive search --json "client secret keycloak auth"
 archive update --tags "keycloak,auth,gcip,terraform,client-secret" --file revised.md ENTRY_ID
 ```
 
-Search terms use OR matching. Results rank title and tags above body text. FTS5 uses the `porter unicode61` tokenizer, so stems and punctuation-separated identifiers are searchable.
+Search is hybrid by default: BM25 over FTS5 and cosine similarity over embeddings, fused with reciprocal rank fusion. `--lexical` and `--semantic` force a single ranker. Lexical terms use OR matching, rank title and tags above body text, and go through the `porter unicode61` tokenizer, so stems and punctuation-separated identifiers are searchable.
 
 `update` replaces the body from stdin or `--file`. To change only metadata, pass `--keep-body`. Empty bodies are rejected on both `add` and `update`.
 
@@ -74,6 +74,16 @@ archive push
 ```
 
 `status` reports entry counts per category, the store format, uncommitted hand edits (for example from Obsidian), and how many commits the remote is missing. `push` pushes the current branch to `origin` and is the only command that ever contacts the network.
+
+## Embeddings
+
+By default entries are embedded with a local model (`sentence-transformers/all-MiniLM-L6-v2`), downloaded once to the user cache directory and run in pure Go — no external services, no API billing. Environment variables configure the backend:
+
+- `ARCHIVE_EMBEDDINGS` — `local` (default), `off`, or an OpenAI-compatible endpoint URL such as `http://localhost:1234/v1` for LM Studio (`/embeddings` is appended when missing).
+- `ARCHIVE_EMBEDDINGS_MODEL` — model name; optional locally, required for remote endpoints.
+- `ARCHIVE_EMBEDDINGS_API_KEY` — optional bearer token for remote endpoints.
+
+Vectors live in `.index/embeddings.db`, keyed by model and content hash. Unlike the FTS index this cache is persistent: reindexing embeds only new or changed content and prunes vectors whose content is gone. Ranking is brute-force cosine in Go — at personal-archive scale that is a few milliseconds, so there is no vector-database dependency. `archive status` reports the active backend and coverage.
 
 ## Upgrades
 

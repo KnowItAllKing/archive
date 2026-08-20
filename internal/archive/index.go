@@ -63,6 +63,9 @@ func (s *Store) Reindex() (int, error) {
 	if err := os.Rename(temporaryPath, indexPath); err != nil {
 		return 0, fmt.Errorf("install rebuilt index: %w", err)
 	}
+	if err := s.ensureEmbeddings(entries); err != nil {
+		return 0, fmt.Errorf("index rebuilt but embeddings failed (fix the embeddings backend, then run archive reindex): %w", err)
+	}
 	return len(entries), nil
 }
 
@@ -122,13 +125,48 @@ func buildIndex(db *sql.DB, entries []Entry) error {
 	return nil
 }
 
-func (s *Store) Search(query, category string, limit int) ([]SearchResult, error) {
+type SearchMode int
+
+const (
+	ModeAuto SearchMode = iota
+	ModeLexical
+	ModeSemantic
+)
+
+const fusionDepth = 50
+
+func (s *Store) Search(query, category string, limit int, mode SearchMode) ([]SearchResult, error) {
 	if err := s.requireInitialized(); err != nil {
 		return nil, err
 	}
 	if limit < 1 {
 		return nil, errors.New("search limit must be at least 1")
 	}
+	if mode == ModeSemantic {
+		return s.searchSemantic(query, category, limit)
+	}
+	depth := limit
+	if mode == ModeAuto && s.Embedder != nil && depth < fusionDepth {
+		depth = fusionDepth
+	}
+	lexical, err := s.searchLexical(query, category, depth)
+	if err != nil {
+		return nil, err
+	}
+	if mode == ModeLexical || s.Embedder == nil {
+		if len(lexical) > limit {
+			lexical = lexical[:limit]
+		}
+		return lexical, nil
+	}
+	semantic, err := s.searchSemantic(query, category, fusionDepth)
+	if err != nil {
+		return nil, err
+	}
+	return fuseRRF(lexical, semantic, limit), nil
+}
+
+func (s *Store) searchLexical(query, category string, limit int) ([]SearchResult, error) {
 	match, err := ftsQuery(query)
 	if err != nil {
 		return nil, err

@@ -21,13 +21,15 @@ personal knowledge. Harness memory is disabled, not migrated.
   categorization, and match-or-create all happen in agent sessions following
   the contract printed by `archive prompt`. The CLI stays mechanical and
   offline, so the intelligence upgrades with the models at zero code change.
-- **No API-key billing, ever.** All LLM work runs through subscription CLIs
-  (claude, codex, ...). This rules out cloud embedding APIs; if vector search
-  is ever added it must use local embeddings.
-- **Lexical search first.** At the expected scale (low thousands of entries),
-  FTS5 with OR-matching, BM25, title/tags boosting, and agent-side query
-  expansion is sufficient. Entries carry synonym tags so short human queries
-  land.
+- **No API-key billing by default.** All LLM work runs through subscription
+  CLIs (claude, codex, ...). Embeddings default to a local pure-Go model;
+  pointing `ARCHIVE_EMBEDDINGS` at a remote OpenAI-compatible endpoint (LM
+  Studio, an API) is an explicit per-machine opt-in.
+- **Hybrid search, no vector database.** FTS5 BM25 (OR-matching, title/tags
+  boosted) fused with cosine similarity via reciprocal rank fusion. At the
+  expected scale (low thousands of entries), cosine is brute-forced in Go over
+  a persistent embedding cache keyed by model and content hash — no sqlite-vec,
+  no cgo. Entries still carry synonym tags so short human queries land.
 - **Living wiki, not a log.** Ingest searches for prior art and updates the
   one authoritative entry per topic; Git history preserves its evolution.
 - **Curated taxonomy.** Agents must pick from `categories.yaml` or file under

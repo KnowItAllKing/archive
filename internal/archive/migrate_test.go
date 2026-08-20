@@ -62,7 +62,7 @@ func TestSearchRebuildsStaleIndex(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	results, err := store.Search("keycloak", "", 10)
+	results, err := store.Search("keycloak", "", 10, ModeAuto)
 	if err != nil {
 		t.Fatalf("search did not rebuild stale index: %v", err)
 	}

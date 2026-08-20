@@ -43,7 +43,7 @@ func TestStoreWorkflow(t *testing.T) {
 		}
 	}
 
-	before, err := store.Search("client secret keycloak auth", "", 10)
+	before, err := store.Search("client secret keycloak auth", "", 10, ModeAuto)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestStoreWorkflow(t *testing.T) {
 	if err := os.Remove(indexPath); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.Search("client secret keycloak auth", "", 10); err != nil {
+	if _, err := store.Search("client secret keycloak auth", "", 10, ModeAuto); err != nil {
 		t.Fatalf("search did not rebuild missing index: %v", err)
 	}
 	if _, err := os.Stat(indexPath); err != nil {
@@ -86,7 +86,7 @@ func TestStoreWorkflow(t *testing.T) {
 	} else if count != 3 {
 		t.Fatalf("reindexed %d entries, want 3", count)
 	}
-	after, err := store.Search("client secret keycloak auth", "", 10)
+	after, err := store.Search("client secret keycloak auth", "", 10, ModeAuto)
 	if err != nil {
 		t.Fatal(err)
 	}

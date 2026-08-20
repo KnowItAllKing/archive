@@ -13,7 +13,7 @@ import (
 	archive "github.com/kai/archive/internal/archive"
 )
 
-const version = "1.0.1"
+const version = "1.0.2"
 
 const usage = `archive stores distilled knowledge in local Markdown files.
 
@@ -21,7 +21,7 @@ Usage:
   archive init [--remote URL]
   archive add --title TITLE --category CATEGORY --tags TAGS [--source SOURCE] [--file FILE] [--raw FILE]
   archive update [flags] ID
-  archive search [--category CATEGORY] [-n LIMIT] [--json] QUERY
+  archive search [--category CATEGORY] [-n LIMIT] [--lexical | --semantic] [--json] QUERY
   archive show [--json] ID
   archive list [--category CATEGORY] [--tag TAG] [--json]
   archive categories [--json]
@@ -149,6 +149,11 @@ func runStatus(store *archive.Store, args []string, stdout io.Writer) error {
 	for _, name := range names {
 		fmt.Fprintf(stdout, "  %s: %d\n", name, status.Categories[name])
 	}
+	if status.Embeddings == "off" {
+		fmt.Fprintln(stdout, "embeddings: off")
+	} else {
+		fmt.Fprintf(stdout, "embeddings: %s (%d/%d embedded)\n", status.Embeddings, status.Embedded, status.Entries)
+	}
 	if status.Remote == "" {
 		fmt.Fprintln(stdout, "remote: none")
 	} else {
@@ -249,14 +254,23 @@ func runSearch(store *archive.Store, args []string, stdout io.Writer) error {
 	fs := newFlagSet("search")
 	limit := fs.Int("n", 10, "maximum results")
 	category := fs.String("category", "", "category filter")
+	lexical := fs.Bool("lexical", false, "lexical FTS search only, skip embeddings")
+	semantic := fs.Bool("semantic", false, "semantic vector search only")
 	jsonOutput := fs.Bool("json", false, "print JSON")
 	if err := fs.Parse(args); err != nil {
 		return fmt.Errorf("search flags: %w", err)
 	}
-	if fs.NArg() == 0 {
-		return errors.New("usage: archive search [--category CATEGORY] [-n LIMIT] [--json] QUERY")
+	if fs.NArg() == 0 || (*lexical && *semantic) {
+		return errors.New("usage: archive search [--category CATEGORY] [-n LIMIT] [--lexical | --semantic] [--json] QUERY")
 	}
-	results, err := store.Search(strings.Join(fs.Args(), " "), *category, *limit)
+	mode := archive.ModeAuto
+	if *lexical {
+		mode = archive.ModeLexical
+	}
+	if *semantic {
+		mode = archive.ModeSemantic
+	}
+	results, err := store.Search(strings.Join(fs.Args(), " "), *category, *limit, mode)
 	if err != nil {
 		return err
 	}

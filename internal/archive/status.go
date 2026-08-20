@@ -12,6 +12,8 @@ type Status struct {
 	Format     int            `json:"format"`
 	Entries    int            `json:"entries"`
 	Categories map[string]int `json:"categories"`
+	Embeddings string         `json:"embeddings"`
+	Embedded   int            `json:"embedded"`
 	Remote     string         `json:"remote,omitempty"`
 	Unpushed   int            `json:"unpushed"`
 	Dirty      []string       `json:"dirty"`
@@ -32,6 +34,15 @@ func (s *Store) Status() (Status, error) {
 	categories := map[string]int{}
 	for _, entry := range entries {
 		categories[entry.Category]++
+	}
+	embeddings := "off"
+	embedded := 0
+	if s.Embedder != nil {
+		embeddings = s.Embedder.ID()
+		embedded, err = s.countEmbedded(entries)
+		if err != nil {
+			return Status{}, err
+		}
 	}
 	remote, err := s.remoteURL()
 	if err != nil {
@@ -56,6 +67,7 @@ func (s *Store) Status() (Status, error) {
 	}
 	return Status{
 		Store: s.Root, Format: format, Entries: len(entries), Categories: categories,
+		Embeddings: embeddings, Embedded: embedded,
 		Remote: remote, Unpushed: unpushed, Dirty: dirty,
 	}, nil
 }

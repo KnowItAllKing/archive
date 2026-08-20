@@ -22,8 +22,9 @@ personal: Personal preferences, plans, and notes.
 `
 
 type Store struct {
-	Root string
-	now  func() time.Time
+	Root     string
+	Embedder Embedder
+	now      func() time.Time
 }
 
 type AddInput struct {
@@ -66,7 +67,11 @@ func DefaultStore() (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve ARCHIVE_STORE %q: %w", root, err)
 	}
-	return &Store{Root: abs, now: time.Now}, nil
+	embedder, err := NewEmbedderFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return &Store{Root: abs, Embedder: embedder, now: time.Now}, nil
 }
 
 func NewStore(root string) *Store {
